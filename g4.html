@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizer V10.1 - Kiyoshi Black</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* ALTERAÇÃO: Fundo Preto Absoluto */
+        body { background-color: #000000; color: white; overflow-x: hidden; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        canvas { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: contain;
+            background-color: #000000;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        // --- ÍCONES ---
+        const IconMusic = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>;
+        const IconUpload = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
+        const IconPlay = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>;
+        const IconDownload = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
+        const IconLoader = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>;
+        const IconRefresh = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>;
+        const IconSquare = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>;
+        const IconActivity = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>;
+        const IconMic = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>;
+
+        // --- IMPLEMENTAÇÃO DE PERLIN NOISE ---
+        const Noise = (function() {
+            const p = new Uint8Array(512);
+            const permutation = [151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,190,6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,88,237,149,56,87,174,20,125,136,171,168,68,175,74,165,71,134,139,48,27,166,77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,245,40,244,102,143,54,65,25,63,161,1,216,80,73,209,76,132,187,208,89,18,169,200,196,135,130,116,188,159,86,164,100,109,198,173,186,3,64,52,217,226,250,124,123,5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,223,183,170,213,119,248,152,2,44,154,163,70,221,153,101,155,167,43,172,9,129,22,39,253,19,98,108,110,79,113,224,232,178,185,112,104,218,246,97,228,251,34,242,193,238,210,144,12,191,179,162,241,81,51,145,235,249,14,239,107,49,192,214,31,181,199,106,157,184,84,204,176,115,121,50,45,127,4,150,254,138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180];
+            for (let i=0; i < 256 ; i++) p[256+i] = p[i] = permutation[i];
+            
+            function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+            function lerp(t, a, b) { return a + t * (b - a); }
+            function grad(hash, x, y, z) {
+                const h = hash & 15;
+                const u = h<8 ? x : y, v = h<4 ? y : h==12||h==14 ? x : z;
+                return ((h&1) == 0 ? u : -u) + ((h&2) == 0 ? v : -v);
+            }
+            
+            return {
+                perlin3: function(x, y, z) {
+                    const X = Math.floor(x) & 255, Y = Math.floor(y) & 255, Z = Math.floor(z) & 255;
+                    x -= Math.floor(x); y -= Math.floor(y); z -= Math.floor(z);
+                    const u = fade(x), v = fade(y), w = fade(z);
+                    const A = p[X]+Y, AA = p[A]+Z, AB = p[A+1]+Z, B = p[X+1]+Y, BA = p[B]+Z, BB = p[B+1]+Z;
+                    return lerp(w, lerp(v, lerp(u, grad(p[AA], x, y, z), grad(p[BA], x-1, y, z)),
+                                   lerp(u, grad(p[AB], x, y-1, z), grad(p[BB], x-1, y-1, z))),
+                           lerp(v, lerp(u, grad(p[AA+1], x, y, z-1), grad(p[BA+1], x-1, y, z-1)),
+                                   lerp(u, grad(p[AB+1], x, y-1, z-1), grad(p[BB+1], x-1, y-1, z-1))));
+                }
+            };
+        })();
+
+        // Função auxiliar para HSB -> RGB
+        function hslToRgb(h, s, l) {
+            let r, g, b;
+            if (s === 0) { r = g = b = l; } else {
+                const hue2rgb = (p, q, t) => {
+                    if (t < 0) t += 1;
+                    if (t > 1) t -= 1;
+                    if (t < 1/6) return p + (q - p) * 6 * t;
+                    if (t < 1/2) return q;
+                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                    return p;
+                };
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1/3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1/3);
+            }
+            return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`;
+        }
+
+        const App = () => {
+            const [step, setStep] = useState('setup'); 
+            const [metaData, setMetaData] = useState({ song: '', author: '' });
+            const [audioFile, setAudioFile] = useState(null);
+            const [videoBlob, setVideoBlob] = useState(null);
+            const [progress, setProgress] = useState(0);
+
+            const canvasRef = useRef(null);
+            const engine = useRef({
+                ctx: null, source: null, analyser: null, dest: null,
+                recorder: null, chunks: [], rafId: null, audioBuffer: null,
+                canvasCtx: null, frameCount: 0
+            });
+
+            const VIDEO_WIDTH = 1280;
+            const VIDEO_HEIGHT = 720;
+
+            const handleFileChange = (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    setAudioFile(e.target.files[0]);
+                }
+            };
+
+            const startProcess = async () => {
+                if (!audioFile) return;
+                try {
+                    setStep('loading');
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    const ctx = new AudioContext();
+                    if (ctx.state === 'suspended') await ctx.resume();
+                    engine.current.ctx = ctx;
+
+                    setProgress(30);
+                    const arrayBuffer = await audioFile.arrayBuffer();
+                    setProgress(60);
+                    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+                    engine.current.audioBuffer = audioBuffer;
+                    setProgress(100);
+
+                    setStep('playing');
+                    setTimeout(() => initVisualizer(audioBuffer), 100);
+                } catch (e) {
+                    console.error(e);
+                    alert("Erro: " + e.message);
+                    setStep('setup');
+                }
+            };
+
+            const initVisualizer = (audioBuffer) => {
+                const canvas = canvasRef.current;
+                canvas.width = VIDEO_WIDTH;
+                canvas.height = VIDEO_HEIGHT;
+                
+                const canvasCtx = canvas.getContext('2d');
+                engine.current.canvasCtx = canvasCtx;
+
+                const ctx = engine.current.ctx;
+                const source = ctx.createBufferSource();
+                source.buffer = audioBuffer;
+                
+                const analyser = ctx.createAnalyser();
+                analyser.fftSize = 4096; 
+                analyser.smoothingTimeConstant = 0.85; 
+
+                const dest = ctx.createMediaStreamDestination();
+                source.connect(analyser);
+                analyser.connect(ctx.destination);
+                source.connect(dest);
+                
+                engine.current.source = source;
+                engine.current.analyser = analyser;
+                engine.current.dest = dest;
+
+                const canvasStream = canvas.captureStream(30);
+                const combinedStream = new MediaStream([
+                    ...canvasStream.getVideoTracks(),
+                    ...dest.stream.getAudioTracks()
+                ]);
+
+                let mimeType = 'video/webm';
+                if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) mimeType = 'video/webm;codecs=vp9';
+                
+                const recorder = new MediaRecorder(combinedStream, { 
+                    mimeType, 
+                    videoBitsPerSecond: 8000000 
+                });
+                
+                recorder.ondataavailable = e => { if (e.data.size > 0) engine.current.chunks.push(e.data); };
+                recorder.onstop = () => {
+                    const blob = new Blob(engine.current.chunks, { type: mimeType });
+                    setVideoBlob(blob);
+                    setStep('finished');
+                    cleanup();
+                };
+
+                engine.current.recorder = recorder;
+                engine.current.chunks = [];
+                engine.current.frameCount = 0;
+                
+                source.start(0);
+                recorder.start();
+                drawLoop();
+
+                source.onended = () => stopRecording();
+            };
+
+            const drawLoop = () => {
+                if(step === 'finished') return;
+                engine.current.rafId = requestAnimationFrame(drawLoop);
+
+                const { analyser, canvasCtx, ctx } = engine.current;
+                engine.current.frameCount++;
+                const frameCount = engine.current.frameCount;
+
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                analyser.getByteFrequencyData(dataArray);
+
+                const width = VIDEO_WIDTH;
+                const height = VIDEO_HEIGHT;
+                const cx = width / 2;
+                const cy = height / 2;
+
+                // ALTERAÇÃO: Fundo Preto Absoluto (#000000)
+                canvasCtx.fillStyle = '#000000'; 
+                canvasCtx.fillRect(0, 0, width, height);
+
+                // Áudio (Voz Masculina Range)
+                const sampleRate = ctx.sampleRate;
+                const binSize = sampleRate / analyser.fftSize;
+                const voiceMinFreq = 80; 
+                const voiceMaxFreq = 450;
+                const startBin = Math.floor(voiceMinFreq / binSize); 
+                const endBin = Math.floor(voiceMaxFreq / binSize);   
+
+                let voiceEnergy = 0;
+                let count = 0;
+                for(let i = startBin; i < endBin; i++) {
+                    voiceEnergy += dataArray[i];
+                    count++;
+                }
+                voiceEnergy = count > 0 ? voiceEnergy / count : 0;
+                
+                const energyNorm = Math.pow(voiceEnergy / 255, 2.0);
+
+                const time = frameCount * 0.015;
+                
+                drawText(canvasCtx, width, height, energyNorm);
+
+                canvasCtx.save();
+                canvasCtx.translate(cx, cy);
+
+                const baseLen = 50; 
+                const maxLenBonus = 350 * energyNorm * 1.5;
+
+                for (let deg = 0; deg < 360; deg += 4) {
+                    const angle = (deg * Math.PI) / 180;
+                    
+                    const noiseVal = Noise.perlin3(Math.cos(angle) + 1, Math.sin(angle) + 1, time);
+                    const len = baseLen + (noiseVal * 0.5 + 0.5) * maxLenBonus;
+
+                    // Cores mais vivas para contrastar com o preto
+                    const hue = ((deg + frameCount * 0.5) % 360) / 360;
+                    const color = hslToRgb(hue, 0.8, 0.6); // Saturação aumentada
+
+                    canvasCtx.strokeStyle = color;
+                    canvasCtx.lineWidth = 1.5;
+                    canvasCtx.lineCap = 'round';
+                    canvasCtx.lineJoin = 'round';
+
+                    canvasCtx.save();
+                    canvasCtx.rotate(angle);
+                    
+                    canvasCtx.beginPath();
+                    const startR = 30 + (energyNorm * 20);
+                    
+                    for(let r = startR; r < len; r += 10) {
+                        let perturbation = Noise.perlin3(r * 0.01, time * 2, deg * 0.01);
+                        perturbation = perturbation * (15 + energyNorm * 30);
+                        if (r > len - 20) perturbation *= 0.1;
+                        if (r === startR) perturbation = 0;
+                        canvasCtx.lineTo(r, perturbation);
+                    }
+                    canvasCtx.stroke();
+
+                    const endPerturbation = Noise.perlin3(len * 0.01, time * 2, deg * 0.01) * (15 + energyNorm * 30) * 0.1;
+                    
+                    canvasCtx.fillStyle = color;
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(len, endPerturbation, 2, 0, Math.PI * 2);
+                    canvasCtx.fill();
+
+                    canvasCtx.restore();
+                }
+
+                canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                canvasCtx.lineWidth = 1;
+                canvasCtx.beginPath();
+                canvasCtx.arc(0, 0, 80 + (energyNorm * 20), 0, Math.PI * 2);
+                canvasCtx.stroke();
+
+                canvasCtx.restore();
+            };
+
+            const drawText = (ctx, width, height, energy) => {
+                const textLeft = 60;
+                const textBottom = height - 60;
+                
+                ctx.fillStyle = `rgba(255, 255, 255, ${0.5 + energy * 0.5})`;
+                ctx.shadowColor = 'white';
+                ctx.shadowBlur = 10 * energy;
+                ctx.fillRect(textLeft - 15, textBottom - 55, 4, 60);
+                ctx.shadowBlur = 0;
+
+                ctx.font = '900 40px sans-serif';
+                ctx.fillStyle = '#ffffff'; // Texto branco puro
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(metaData.song, textLeft, textBottom - 30);
+
+                ctx.font = '500 24px sans-serif';
+                ctx.fillStyle = '#bbbbbb';
+                ctx.fillText(metaData.author.toUpperCase(), textLeft, textBottom);
+            };
+
+            const stopRecording = () => {
+                if (engine.current.recorder && engine.current.recorder.state === 'recording') {
+                    engine.current.recorder.stop();
+                }
+            };
+
+            const cleanup = () => {
+                if(engine.current.rafId) cancelAnimationFrame(engine.current.rafId);
+                if(engine.current.source) { try { engine.current.source.stop(); } catch(e){} }
+                if(engine.current.ctx) engine.current.ctx.close();
+            };
+
+            const reset = () => {
+                cleanup();
+                setStep('setup');
+                setAudioFile(null);
+                setMetaData({ song: '', author: '' });
+                setVideoBlob(null);
+                setProgress(0);
+                engine.current.chunks = [];
+            };
+
+            const download = () => {
+                if (!videoBlob) return;
+                const url = URL.createObjectURL(videoBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${metaData.song}_kiyoshi_black.webm`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+
+            return (
+                <div className="min-h-screen bg-black text-white font-sans flex flex-col items-center justify-center p-4">
+                    <div className="absolute top-4 left-4 text-xs font-mono text-gray-400 font-bold opacity-80 flex items-center gap-2 z-10">
+                        <IconActivity /> V10.1 KIYOSHI BLACK
+                    </div>
+
+                    {step === 'setup' && (
+                        <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 p-8 rounded-2xl shadow-2xl animate-fade-in z-20">
+                            <div className="flex items-center gap-3 mb-8">
+                                <div className="bg-neutral-700 p-2 rounded-lg text-white">
+                                    <IconMic />
+                                </div>
+                                <h1 className="text-2xl font-bold text-gray-200">Gerador Doodle</h1>
+                            </div>
+                            
+                            <div className="space-y-6">
+                                <div className="space-y-4">
+                                    <input 
+                                        className="w-full bg-black/40 border border-neutral-700 rounded-lg p-4 text-white focus:border-white outline-none placeholder-gray-500"
+                                        placeholder="Título da Música"
+                                        value={metaData.song}
+                                        onChange={e => setMetaData({...metaData, song: e.target.value})}
+                                    />
+                                    <input 
+                                        className="w-full bg-black/40 border border-neutral-700 rounded-lg p-4 text-white focus:border-white outline-none placeholder-gray-500"
+                                        placeholder="Nome do Artista"
+                                        value={metaData.author}
+                                        onChange={e => setMetaData({...metaData, author: e.target.value})}
+                                    />
+                                </div>
+
+                                <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-neutral-700 hover:border-white hover:bg-white/5 rounded-xl cursor-pointer transition-all">
+                                    {audioFile ? (
+                                        <span className="text-gray-200 font-bold flex items-center gap-2 bg-neutral-800 px-4 py-2 rounded-full">
+                                            <IconMusic /> {audioFile.name}
+                                        </span>
+                                    ) : (
+                                        <div className="text-center text-gray-400">
+                                            <div className="flex justify-center mb-2"><IconUpload /></div>
+                                            <span className="text-sm font-medium">Carregar MP3</span>
+                                        </div>
+                                    )}
+                                    <input type="file" className="hidden" accept="audio/*" onChange={handleFileChange} />
+                                </label>
+
+                                <button 
+                                    onClick={startProcess}
+                                    disabled={!audioFile || !metaData.song || !metaData.author}
+                                    className="w-full bg-white hover:bg-gray-200 text-black font-bold py-4 rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    <IconPlay /> PROCESSAR E GRAVAR
+                                </button>
+                                <p className="text-xs text-gray-500 text-center">
+                                    Fundo Preto | Estilo Doodle | Voz Masculina
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 'loading' && (
+                        <div className="text-center z-20">
+                            <div className="flex justify-center mb-6 text-white"><IconLoader /></div>
+                            <h2 className="text-2xl font-bold mb-2 text-gray-200">Gerando Arte...</h2>
+                            <div className="w-64 h-2 bg-neutral-800 rounded-full overflow-hidden mx-auto mt-4">
+                                <div className="h-full bg-white transition-all duration-300 ease-out" style={{ width: `${progress}%` }}></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 'playing' && (
+                        <div className="w-full h-full fixed inset-0 flex flex-col items-center justify-center bg-black z-50">
+                            <div className="relative w-full h-full max-w-7xl max-h-screen flex items-center justify-center p-4">
+                                <canvas ref={canvasRef} className="max-w-full max-h-full object-contain shadow-2xl" />
+                                
+                                <div className="absolute top-8 right-8 bg-white/10 text-white text-xs font-bold px-4 py-2 rounded-full animate-pulse flex items-center gap-2 pointer-events-none border border-white/20">
+                                    <div className="w-2 h-2 bg-red-500 rounded-full"></div> REC
+                                </div>
+                            </div>
+                            
+                            <div className="absolute bottom-8 flex flex-col items-center gap-4 w-full">
+                                <button 
+                                    onClick={stopRecording}
+                                    className="bg-white/10 hover:bg-white/20 text-white border border-white/30 px-8 py-4 rounded-full font-bold tracking-widest uppercase transition-all flex items-center gap-3 backdrop-blur-sm"
+                                >
+                                    <IconSquare /> Parar e Salvar
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 'finished' && (
+                        <div className="bg-neutral-900 border border-neutral-800 p-8 rounded-2xl shadow-2xl text-center max-w-md w-full animate-fade-in z-20">
+                            <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6 text-white">
+                                <IconDownload />
+                            </div>
+                            <h2 className="text-3xl font-bold text-white mb-2">Vídeo Pronto!</h2>
+                            <p className="text-gray-400 mb-8 text-sm">Arte generativa com fundo preto.</p>
+                            
+                            <div className="space-y-3">
+                                <button onClick={download} className="w-full bg-white hover:bg-gray-200 text-black font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2">
+                                    <IconDownload /> Baixar Vídeo (.webm)
+                                </button>
+                                <button onClick={reset} className="w-full bg-neutral-800 hover:bg-neutral-700 text-white font-medium py-4 rounded-xl flex items-center justify-center gap-2">
+                                    <IconRefresh /> Criar Novo
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
